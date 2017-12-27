@@ -10,6 +10,40 @@ import Foundation
 import ARKit
 import UIKit
 import Vision
+import CoreML
+
+func checkRectObservation(_ observatoin: VNRectangleObservation, currentFrame: ARFrame) -> Bool {
+    let currentImage = CIImage(cvPixelBuffer: currentFrame.capturedImage)
+    let convertedRect = convertFromCamera(observatoin.boundingBox, size: currentImage.extent.size)
+    let rect = expandRect(convertedRect, extent: currentImage.extent)
+    let croppedImage = currentImage.cropped(to: rect)
+    
+    // Perform request on background thread
+    DispatchQueue.global(qos: .background).sync {
+   
+        guard let model = try? VNCoreMLModel(for: MobileNet().model) else {return}
+    
+        let mlRequest = VNCoreMLRequest(model: model){
+            (request, error) in
+            
+            // Jump back onto the main thread
+            DispatchQueue.main.async {
+                guard let results = request.results as? [VNClassificationObservation] else {return}
+                
+                if results.first!.identifier.contains("windows") || results.first!.identifier.contains("shoji") {
+                    
+                    
+                }
+            }
+        }
+        try? VNImageRequestHandler(ciImage: croppedImage, options: [:]).perform([mlRequest])
+    }
+    
+    
+//    return self.objectiveDetected
+    
+    return false
+}
 
 func convertFromCamera(_ point: CGPoint, view sceneView: ARSCNView) -> CGPoint {
     let orientation = UIApplication.shared.statusBarOrientation

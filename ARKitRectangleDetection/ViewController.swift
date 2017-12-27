@@ -453,13 +453,14 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
         detectedRectangleObservation.removeAll()
         self.objectiveDetected = false
         
+        print("hey")
         // Perform request on background thread
         DispatchQueue.global(qos: .background).async {
             let request = VNDetectRectanglesRequest(completionHandler: { (request, error) in
                 
                 // Jump back onto the main thread
-                DispatchQueue.main.async {
-                    
+//                DispatchQueue.main.async {
+                
                     // Mark that we've finished searching for rectangles
                     self.searchingForRectangles = false
                     
@@ -482,6 +483,7 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
                     // Find the rect that is a window
                     let currentImage = CIImage(cvPixelBuffer: currentFrame.capturedImage)
                     let windows = observations.filter({ (result) -> Bool in
+                
                         self.objectiveDetected = false
                         
                         let convertedRect = convertFromCamera(result.boundingBox, size: currentImage.extent.size)
@@ -489,7 +491,7 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
                         let croppedImage = currentImage.cropped(to: rect)
 
                         // Perform request on background thread
-//                        DispatchQueue.global(qos: .background).async {
+//                        DispatchQueue(label: "CNN").async {
                             // TODO: shoulw this line be a global variable?
                             guard let model = try? VNCoreMLModel(for: MobileNet().model) else {return false}
 
@@ -500,9 +502,9 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
 //                                DispatchQueue.main.async {
                                     guard let results = request.results as? [VNClassificationObservation] else {return}
                             
-                                    if results.first!.identifier.contains("window") || results.first!.identifier.contains("shoji") {
+                                    if results.first!.identifier.contains("desktop") || results.first!.identifier.contains("shoji") {
+                                        print("yosemite")
                                         self.objectiveDetected = true
-
                                     }
 //                                    for res in results {
 ////                                        if res.identifier.contains("window") || res.identifier.contains("shoji") {
@@ -511,14 +513,17 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
 //                                            self.objectiveDetected = true
 //                                        }
 //                                    }
-                                }
-//                            }
+//                                }
+                            }
                             try? VNImageRequestHandler(cvPixelBuffer: currentFrame.capturedImage, options: [:]).perform([mlRequest])
 //                        }
                         
-                        
+                        if self.objectiveDetected == true {
+                            print("grand cannon baby")
+                        }
                         return self.objectiveDetected
                     })
+            
 //                    guard let selectedRect = observations.filter({ (result) -> Bool in
 ////                        let convertedRect = self.sceneView.convertFromCamera(result.boundingBox)
 ////                        return convertedRect.contains(location)
@@ -530,6 +535,7 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
 //                    }
                     
                     // Outline observed rectangles
+                DispatchQueue.main.async {
                     for observation in windows {
                         let points = [observation.topLeft, observation.topRight, observation.bottomRight, observation.bottomLeft]
                         let convertedPoints = points.map { self.sceneView.convertFromCamera($0) }
@@ -539,9 +545,10 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
                         self.detectedRectangleOutlineLayers.append(layer)
                         
                         // Track the selected rectangle and when it was found
-                        self.detectedRectangleObservation.append(observation)
+//                        self.detectedRectangleObservation.append(observation)
                         self.selectedRectangleLastUpdated = Date()
                     }
+                }
                     
                     
 //                    // Check if the user stopped touching the screen while we were in the background.
@@ -550,7 +557,7 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
 //                        // Create a planeRect and add a RectangleNode
 //                        self.addPlaneRect(for: selectedRect)
 //                    }
-                }
+//                }
             })
             
             // Don't limit resulting number of observations
