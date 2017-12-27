@@ -34,7 +34,7 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
     // Observed rectangle currently being touched
     private var selectedRectangleObservation: VNRectangleObservation?
     /// Andrew's
-    private var detectedRectangleObservation = [VNRectangleObservation]()
+    private var detectedRectangleObservations = [VNRectangleObservation]()
     private var objectiveDetected  = false  /// TODO: is there better way than using global variable like such
     
     // The time the current rectangle selection was last updated
@@ -156,71 +156,58 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
     }
     
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard let touch = touches.first,
-            let currentFrame = sceneView.session.currentFrame else {
-            return
-        }
-        
-        currTouchLocation = touch.location(in: sceneView)
-        findRectangle(locationInScene: currTouchLocation!, frame: currentFrame)
-        message = .helpTapReleaseRect
+        //        guard let touch = touches.first,
+        //            let currentFrame = sceneView.session.currentFrame else {
+        //            return
+        //        }
+        //
+        //        currTouchLocation = touch.location(in: sceneView)
+        //        findRectangle(locationInScene: currTouchLocation!, frame: currentFrame)
+        //        message = .helpTapReleaseRect
     }
     
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
-        // Ignore if we're currently searching for a rect
-        if searchingForRectangles {
-            return
-        }
-        
+        //        // Ignore if we're currently searching for a rect
+        //        if searchingForRectangles {
+        //            return
+        //        }
+        //
         guard let touch = touches.first,
             let currentFrame = sceneView.session.currentFrame else {
                 return
         }
         
         currTouchLocation = touch.location(in: sceneView)
-        findRectangle(locationInScene: currTouchLocation!, frame: currentFrame)
+        for observation in detectedRectangleObservations {
+            let convertedRect = self.sceneView.convertFromCamera(observation.boundingBox)
+            if convertedRect.contains(currTouchLocation!){
+                // Create a planeRect and add a RectangleNode
+                addPlaneRect(for: observation)
+            }
+        }
+        //        findRectangle(locationInScene: currTouchLocation!, frame: currentFrame)
     }
     
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         currTouchLocation = nil
         message = .helpTapHoldRect
-
-        guard let selectedRect = selectedRectangleObservation else {
-            return
+        
+        
+        /// MARK:- Andrew's Code
+        guard let touch = touches.first,
+            let currentFrame = sceneView.session.currentFrame else {
+                return
         }
         
+        currTouchLocation = touch.location(in: sceneView)
         
-        /// MARK:- Andrew's Code:
-        /// Only execute addPlaneRect() if rectangle is window
-        guard let currentImage = sceneView.session.currentFrame?.capturedImage else {return}
-        let currentImageCI     = CIImage(cvPixelBuffer: currentImage)
-        let bl = convertFromCamera(selectedRect.bottomLeft, size: currentImageCI.extent.size),
-        br = convertFromCamera(selectedRect.bottomRight, size: currentImageCI.extent.size),
-        tl = convertFromCamera(selectedRect.topLeft, size: currentImageCI.extent.size)
-        let rect = expandRect(CGRect(x: bl.x, y: bl.y, width: br.x - bl.x, height:tl.y - bl.y),
-                              extent: currentImageCI.extent)
-        let croppedImage       = currentImageCI.cropped(to: rect)
-        
-        // TODO: current predictor has low confidence because image quality is very poor how to improve image quality?
-        guard let model = try? VNCoreMLModel(for: Resnet50().model) else {return}
-        let request = VNCoreMLRequest(model: model) {
-            (finishedReq, err) in
-            
-            
-            guard let results = finishedReq.results as? [VNClassificationObservation] else {return}
-            guard let firstObservation = results.first else {return}
-            print("======================================================================")
-            print(firstObservation.identifier, firstObservation.confidence )
-            print("======================================================================")
+        for observation in detectedRectangleObservations {
+            let convertedRect = self.sceneView.convertFromCamera(observation.boundingBox)
+            if convertedRect.contains(currTouchLocation!){
+                // Create a planeRect and add a RectangleNode
+                addPlaneRect(for: observation)
+            }
         }
-        try? VNImageRequestHandler(ciImage: croppedImage, options: [:]).perform([request])
-  
-      
-        
-        // Create a planeRect and add a RectangleNode
-        addPlaneRect(for: selectedRect)
-        
-        
     }
     
     // MARK: - IBOutlets
@@ -450,7 +437,7 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
     private func findRectangle(currentFrame: ARFrame) {
         // Note that we're actively searching for rectangles
         searchingForRectangles = true
-        detectedRectangleObservation.removeAll()
+        detectedRectangleObservations.removeAll()
         self.objectiveDetected = false
         
         // Perform request on background thread
@@ -539,7 +526,7 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
                         self.detectedRectangleOutlineLayers.append(layer)
                         
                         // Track the selected rectangle and when it was found
-                        self.detectedRectangleObservation.append(observation)
+                        self.detectedRectangleObservations.append(observation)
                         self.selectedRectangleLastUpdated = Date()
                     }
                     
