@@ -47,6 +47,7 @@ class RectangleNode: SCNNode {
         transform = SCNMatrix4Rotate(transform, orientation, 0, 1, 0)
         
         rectNode.transform = transform
+        rectNode.geometry?.firstMaterial?.isDoubleSided = true
         
         // We add the new node to ourself since we inherited from SCNNode
         self.addChildNode(rectNode)

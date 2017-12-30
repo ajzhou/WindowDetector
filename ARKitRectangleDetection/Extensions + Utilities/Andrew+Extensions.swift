@@ -43,29 +43,30 @@ func convertFromCamera(_ point: CGPoint, size: CGSize) -> CGPoint {
 }
 func convertFromCamera(_ rect: CGRect, size: CGSize) -> CGRect {
     let orientation = UIApplication.shared.statusBarOrientation
+    print(orientation)
     let x, y, w, h: CGFloat
 
     switch orientation {
     case .portrait, .unknown:
-        w = rect.height
-        h = rect.width
-        x = rect.origin.y
-        y = rect.origin.x
-    case .landscapeLeft:
-        w = rect.width
-        h = rect.height
-        x = 1 - rect.origin.x - w
-        y = rect.origin.y
-    case .landscapeRight:
         w = rect.width
         h = rect.height
         x = rect.origin.x
-        y = 1 - rect.origin.y - h
-    case .portraitUpsideDown:
+        y = rect.origin.y
+    case .landscapeLeft:
+        w = rect.height
+        h = rect.width
+        x = rect.origin.y
+        y = 1 - rect.origin.x - h
+    case .landscapeRight:
         w = rect.height
         h = rect.width
         x = 1 - rect.origin.y - w
-        y = 1 - rect.origin.x - h
+        y = rect.origin.x
+    case .portraitUpsideDown:
+        w = rect.height
+        h = rect.width
+        x = 1 - rect.origin.x - w
+        y = 1 - rect.origin.y - h
     }
 
     return CGRect(x: x * size.width, y: y * size.height, width: w * size.width, height: h * size.height)

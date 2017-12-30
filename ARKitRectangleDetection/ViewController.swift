@@ -13,7 +13,7 @@ import Vision
 import CoreML
 
 class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
-
+    
     // MARK: - IBOutlets
     
     @IBOutlet var sceneView: ARSCNView!
@@ -26,6 +26,8 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
     
     // MARK: - Internal properties used to identify the rectangle the user is selecting
     
+    private let sequenceHandler = VNSequenceRequestHandler()
+    private var isTracking = false
     // Displayed rectangle outline
     private var selectedRectangleOutlineLayer: CAShapeLayer?
     /// Andrew's
@@ -62,7 +64,7 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
             if showDebugOptions {
                 sceneView.debugOptions = [ARSCNDebugOptions.showFeaturePoints, ARSCNDebugOptions.showWorldOrigin]
             } else {
-              sceneView.debugOptions = []
+                sceneView.debugOptions = []
             }
         }
     }
@@ -110,7 +112,7 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
         if showDebugOptions {
             sceneView.debugOptions = [ARSCNDebugOptions.showFeaturePoints, ARSCNDebugOptions.showWorldOrigin]
         }
-
+        
         // Enable default lighting
         sceneView.autoenablesDefaultLighting = true
         
@@ -128,7 +130,7 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
         debugButton.isSelected = showDebugOptions
         
         /// MARK: Andrew's Code
-//        selectedRectangleLastUpdated = Date()
+        //        selectedRectangleLastUpdated = Date()
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -137,7 +139,7 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
         // Create a session configuration
         let configuration = ARWorldTrackingConfiguration()
         configuration.planeDetection = .horizontal
-//        configuration.worldAlignment = .gravityAndHeading
+        //        configuration.worldAlignment = .gravityAndHeading
         
         // Run the view's session
         sceneView.session.run(configuration)
@@ -179,8 +181,10 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
         
         currTouchLocation = touch.location(in: sceneView)
         for observation in detectedRectangleObservations {
+            print("hey-=-")
             let convertedRect = self.sceneView.convertFromCamera(observation.boundingBox)
             if convertedRect.contains(currTouchLocation!){
+                print("hey again")
                 // Create a planeRect and add a RectangleNode
                 addPlaneRect(for: observation)
             }
@@ -249,7 +253,26 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
     // MARK: - ARSessionDelegate
     
     // Update selected rectangle if it's been more than 1 second and the screen is still being touched
+    var frameIncrement = 0
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
+        // Remove outline for observed rectangles
+        for layer in self.detectedRectangleOutlineLayers {
+            layer.removeFromSuperlayer()
+        }
+        self.detectedRectangleOutlineLayers.removeAll()
+        
+        frameIncrement += 1
+        if frameIncrement != 8 {
+            return
+        } else {
+            frameIncrement = 0
+        }
+        
+        
+        if isTracking {
+            return
+        }
+        
         if searchingForRectangles {
             return
         }
@@ -258,20 +281,20 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
             findRectangle(currentFrame: frame)
             return
         }
-//        if timePassed > -1 {
-//            return
-//        }
-
-
+        //        if timePassed > -1 {
+        //            return
+        //        }
+        
+        
         findRectangle(currentFrame: frame)
-//
-//        guard let currTouchLocation = currTouchLocation,
-//            let currentFrame = sceneView.session.currentFrame else {
-//                return
-//        }
-//
-//
-//        findRectangle(locationInScene: currTouchLocation, frame: currentFrame)
+        //
+        //        guard let currTouchLocation = currTouchLocation,
+        //            let currentFrame = sceneView.session.currentFrame else {
+        //                return
+        //        }
+        //
+        //
+        //        findRectangle(locationInScene: currTouchLocation, frame: currentFrame)
     }
     
     // MARK: - ARSCNViewDelegate
@@ -305,7 +328,7 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
             let surface = surfaceNodes[anchor] else {
                 return
         }
-
+        
         surface.removeFromParentNode()
         
         surfaceNodes.removeValue(forKey: anchor)
@@ -380,12 +403,6 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
             /// MARK:- Andrew's Code:
             /// Additional Parameters for Rectangle Detector
             request.quadratureTolerance = 50.0
-//            print("tolearance: \(request.quadratureTolerance)")
-//            print("minimum confidence: \(request.minimumConfidence)")
-//            print("minimum aspect: \(request.minimumAspectRatio)")
-//            print("max aspect: \(request.maximumAspectRatio)")
-//            print("minimum size: \(request.minimumSize)")
-            
             
             // Perform request
             let handler = VNImageRequestHandler(cvPixelBuffer: currentFrame.capturedImage, options: [:])
@@ -434,128 +451,78 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
     }
     
     /// MARK: Andrew's Code
+    
+    // Check if Rectangle Observation is a window using MobileNet.
+    // NOTE: consider running on different thread?
+    lazy var model:VNCoreMLModel = {
+        do {
+            let model = try VNCoreMLModel(for: MobileNet().model)
+            return model
+        } catch {
+            fatalError("Failed to load Vision ML model: \(error)")
+        }
+    }()
+    func checkAndDrawWindow(_ observation: VNRectangleObservation, currentFrame: ARFrame ) {
+        DispatchQueue.main.async { // Crop out image around rectangle for localized classification
+            let currentImage = CIImage(cvPixelBuffer: currentFrame.capturedImage)
+            
+            let convertedRect = convertFromCamera(observation.boundingBox, size: currentImage.extent.size)
+            print(observation.boundingBox)
+//            let rect = expandRect(convertedRect, extent: currentImage.extent)
+            let rect = CGRect(x: 0.0, y: 0.0, width: 500, height: 500)
+            let croppedImage = currentImage.cropped(to: rect)
+
+            DispatchQueue.global(qos: .background).async {
+                let mlRequest = VNCoreMLRequest(model: self.model){ (request, error) in
+                    let results = request.results as! [VNClassificationObservation]
+                    
+                    if results.first!.identifier.contains("window") || results.first!.identifier.contains("shoji") {
+                        guard let confidence = results.first?.confidence else {return}
+                        if confidence > Float(0.2) {
+                            
+                            DispatchQueue.main.async{ // Outline the windows
+                                let points = [observation.topLeft, observation.topRight, observation.bottomRight, observation.bottomLeft]
+                                let convertedPoints = points.map { self.sceneView.convertFromCamera($0) }
+                                let layer = self.drawPolygon(convertedPoints, color: UIColor.red)
+                                self.sceneView.layer.addSublayer(layer)
+                                self.detectedRectangleOutlineLayers.append(layer)
+                                
+                                // Track the selected rectangle and when it was found
+                                self.detectedRectangleObservations.append(observation)
+                                self.selectedRectangleLastUpdated = Date()
+                            }
+                        }
+                    }
+                }
+                mlRequest.imageCropAndScaleOption = .scaleFit
+//                print("current: ", currentImage.extent)
+//                print("cropped: ", croppedImage.extent)
+                try? VNImageRequestHandler(ciImage: croppedImage, options: [:]).perform([mlRequest])
+            }
+        }
+    }
+    
     private func findRectangle(currentFrame: ARFrame) {
         // Note that we're actively searching for rectangles
-        searchingForRectangles = true
+        //        searchingForRectangles = true
         detectedRectangleObservations.removeAll()
         self.objectiveDetected = false
         
         // Perform request on background thread
         DispatchQueue.global(qos: .background).async {
             let request = VNDetectRectanglesRequest(completionHandler: { (request, error) in
-                
-                // Jump back onto the main thread
-                DispatchQueue.main.async {
-                    
-                    // Mark that we've finished searching for rectangles
-                    self.searchingForRectangles = false
-                    
-                    // Access the first result in the array after casting the array as a VNClassificationObservation array
-                    guard let observations = request.results as? [VNRectangleObservation],
-                        let _ = observations.first else {
-                            print ("No results")
-                            self.message = .errNoRect
-                            return
-                    }
-                    
-                    print("\(observations.count) rectangles found")
-                    
-                    // Remove outline for observed rectangles
-                    for layer in self.detectedRectangleOutlineLayers {
-                        layer.removeFromSuperlayer()
-                    }
-                    self.detectedRectangleOutlineLayers.removeAll()
-                    
-                    // Find the rect that is a window
-                    let currentImage = CIImage(cvPixelBuffer: currentFrame.capturedImage)
-                    let windows = observations.filter({ (result) -> Bool in
-                        self.objectiveDetected = false
-                        
-                        let convertedRect = convertFromCamera(result.boundingBox, size: currentImage.extent.size)
-                        let rect = expandRect(convertedRect, extent: currentImage.extent)
-                        let croppedImage = currentImage.cropped(to: rect)
-
-                        // Perform request on background thread
-//                        DispatchQueue.global(qos: .background).async {
-                            // TODO: shoulw this line be a global variable?
-                            guard let model = try? VNCoreMLModel(for: MobileNet().model) else {return false}
-
-                            let mlRequest = VNCoreMLRequest(model: model){
-                                (request, error) in
-
-                                // Jump back onto the main thread
-//                                DispatchQueue.main.async {
-                                    guard let results = request.results as? [VNClassificationObservation] else {return}
-                            
-                                    if results.first!.identifier.contains("window") || results.first!.identifier.contains("shoji") {
-                                        self.objectiveDetected = true
-
-                                    }
-//                                    for res in results {
-////                                        if res.identifier.contains("window") || res.identifier.contains("shoji") {
-//                                        if res.identifier.contains("desktop computer") {
-//                                            print("grand cannon")
-//                                            self.objectiveDetected = true
-//                                        }
-//                                    }
-                                }
-//                            }
-                            try? VNImageRequestHandler(cvPixelBuffer: currentFrame.capturedImage, options: [:]).perform([mlRequest])
-//                        }
-                        
-                        
-                        return self.objectiveDetected
-                    })
-//                    guard let selectedRect = observations.filter({ (result) -> Bool in
-////                        let convertedRect = self.sceneView.convertFromCamera(result.boundingBox)
-////                        return convertedRect.contains(location)
-//                        return true
-//                    }).first else {
-//                        print("No results at touch location")
-//                        self.message = .errNoRect
-//                        return
-//                    }
-                    
-                    // Outline observed rectangles
-                    for observation in windows {
-                        let points = [observation.topLeft, observation.topRight, observation.bottomRight, observation.bottomLeft]
-                        let convertedPoints = points.map { self.sceneView.convertFromCamera($0) }
-                        let layer = self.drawPolygon(convertedPoints, color: UIColor.red)
-                        self.sceneView.layer.addSublayer(layer)
-                        print("----yosemite----")
-                        self.detectedRectangleOutlineLayers.append(layer)
-                        
-                        // Track the selected rectangle and when it was found
-                        self.detectedRectangleObservations.append(observation)
-                        self.selectedRectangleLastUpdated = Date()
-                    }
-                    
-                    
-//                    // Check if the user stopped touching the screen while we were in the background.
-//                    // If so, then we should add the planeRect here instead of waiting for touches to end.
-//                    if self.currTouchLocation == nil {
-//                        // Create a planeRect and add a RectangleNode
-//                        self.addPlaneRect(for: selectedRect)
-//                    }
+                guard let observations = request.results as? [VNRectangleObservation] else {return}
+                for observation in observations  {
+                    self.checkAndDrawWindow(observation, currentFrame: currentFrame)
                 }
             })
             
             // Don't limit resulting number of observations
             request.maximumObservations = 0
-            
-            /// MARK:- Andrew's Code:
-            /// Additional Parameters for Rectangle Detector
             request.quadratureTolerance = 50.0
             request.minimumAspectRatio  = 0.5
             request.maximumAspectRatio  = 2.0
             request.minimumConfidence   = 0.5
-            
-            //            print("tolearance: \(request.quadratureTolerance)")
-            //            print("minimum confidence: \(request.minimumConfidence)")
-            //            print("minimum aspect: \(request.minimumAspectRatio)")
-            //            print("max aspect: \(request.maximumAspectRatio)")
-            //            print("minimum size: \(request.minimumSize)")
-            
             
             // Perform request
             let handler = VNImageRequestHandler(cvPixelBuffer: currentFrame.capturedImage, options: [:])
