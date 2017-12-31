@@ -26,8 +26,6 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
     
     // MARK: - Internal properties used to identify the rectangle the user is selecting
     
-    private let sequenceHandler = VNSequenceRequestHandler()
-    private var isTracking = false
     // Displayed rectangle outline
     private var selectedRectangleOutlineLayer: CAShapeLayer?
     /// Andrew's
@@ -255,6 +253,21 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
     // Update selected rectangle if it's been more than 1 second and the screen is still being touched
     var frameIncrement = 0
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
+        //------
+        if isTracking {
+            for layer in self.detectedRectangleOutlineLayers {
+                layer.removeFromSuperlayer()
+            }
+            self.detectedRectangleOutlineLayers.removeAll()
+
+            guard let lb = lastObservation else {return}
+            DispatchQueue.global(qos: .background).async {
+                self.performTracking(lb, handler: self.sequenceHandler, currentFrame: frame)
+            }
+            return
+        }
+        //------
+        
         // Remove outline for observed rectangles
         for layer in self.detectedRectangleOutlineLayers {
             layer.removeFromSuperlayer()
@@ -462,6 +475,7 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
             fatalError("Failed to load Vision ML model: \(error)")
         }
     }()
+    
     func checkAndDrawWindow(_ observation: VNRectangleObservation, currentFrame: ARFrame ) {
         DispatchQueue.main.async { // Crop out image around rectangle for localized classification
             let currentImage = CIImage(cvPixelBuffer: currentFrame.capturedImage)
@@ -480,17 +494,24 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
                         guard let confidence = results.first?.confidence else {return}
                         if confidence > Float(0.2) {
                             
-                            DispatchQueue.main.async{ // Outline the windows
-                                let points = [observation.topLeft, observation.topRight, observation.bottomRight, observation.bottomLeft]
-                                let convertedPoints = points.map { self.sceneView.convertFromCamera($0) }
-                                let layer = self.drawPolygon(convertedPoints, color: UIColor.red)
-                                self.sceneView.layer.addSublayer(layer)
-                                self.detectedRectangleOutlineLayers.append(layer)
-                                
-                                // Track the selected rectangle and when it was found
-                                self.detectedRectangleObservations.append(observation)
-                                self.selectedRectangleLastUpdated = Date()
-                            }
+                            // -----
+                            // begin tracking
+                            self.lastObservation = observation
+                            self.isTracking = true
+                            self.performTracking(observation, handler: self.sequenceHandler, currentFrame: currentFrame)
+                            // -----
+                            
+//                            DispatchQueue.main.async{ // Outline the windows
+//                                let points = [observation.topLeft, observation.topRight, observation.bottomRight, observation.bottomLeft]
+//                                let convertedPoints = points.map { self.sceneView.convertFromCamera($0) }
+//                                let layer = self.drawPolygon(convertedPoints, color: UIColor.red)
+//                                self.sceneView.layer.addSublayer(layer)
+//                                self.detectedRectangleOutlineLayers.append(layer)
+//
+//                                // Track the selected rectangle and when it was found
+//                                self.detectedRectangleObservations.append(observation)
+//                                self.selectedRectangleLastUpdated = Date()
+//                            }
                         }
                     }
                 }
@@ -512,9 +533,13 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
         DispatchQueue.global(qos: .background).async {
             let request = VNDetectRectanglesRequest(completionHandler: { (request, error) in
                 guard let observations = request.results as? [VNRectangleObservation] else {return}
-                for observation in observations  {
-                    self.checkAndDrawWindow(observation, currentFrame: currentFrame)
-                }
+                
+
+                guard let observation = observations.first else {return}
+                self.checkAndDrawWindow(observation, currentFrame: currentFrame)
+//                for observation in observations  {
+//                    self.checkAndDrawWindow(observation, currentFrame: currentFrame)
+//                }
             })
             
             // Don't limit resulting number of observations
@@ -530,4 +555,49 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
         }
     }
     
+    
+    // Rectangle Tracking Code
+    private var lastObservation: VNRectangleObservation?
+    private var sequenceHandler = VNSequenceRequestHandler()
+    private var isTracking = false
+    private func performTracking(_ observation: VNRectangleObservation, handler: VNSequenceRequestHandler,currentFrame: ARFrame) {
+        let request = VNTrackRectangleRequest(rectangleObservation: observation) { [unowned self] request, error in
+            self.handleTrackingRequest(request, error: error)
+        }
+        request.trackingLevel = .fast
+        
+        do {
+            print("we're tracking")
+            try handler.perform([request], on: currentFrame.capturedImage)
+        }
+        catch {
+//            self.isTracking = false
+//            self.sequenceHandler = VNSequenceRequestHandler()
+            print("==failed==")
+            print(error)
+        }
+    }
+    
+    fileprivate func handleTrackingRequest(_ request: VNRequest, error: Error?) {
+        DispatchQueue.main.async {
+            guard let observation = request.results?.first as? VNRectangleObservation else {
+                return
+            }
+            self.lastObservation = observation
+            
+            // highlight rectangle
+            
+            let points = [observation.topLeft, observation.topRight, observation.bottomRight, observation.bottomLeft]
+            let convertedPoints = points.map { self.sceneView.convertFromCamera($0) }
+            let layer = self.drawPolygon(convertedPoints, color: UIColor.red)
+            self.sceneView.layer.addSublayer(layer)
+            self.detectedRectangleOutlineLayers.append(layer)
+            
+            // Track the selected rectangle and when it was found
+//                self.detectedRectangleObservations.append(observation)
+            self.selectedRectangleLastUpdated = Date()
+            
+            
+        }
+    }
 }

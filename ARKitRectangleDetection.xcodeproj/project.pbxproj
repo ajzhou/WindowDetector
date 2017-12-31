@@ -10,7 +10,6 @@
 		6A3934E31FE483970026A7DB /* Andrew+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A3934E21FE483970026A7DB /* Andrew+Extensions.swift */; };
 		6A3935251FF06E840026A7DB /* Resnet50.mlmodel in Sources */ = {isa = PBXBuildFile; fileRef = 6A3935241FF06E840026A7DB /* Resnet50.mlmodel */; };
 		6A3935271FF2C6840026A7DB /* MobileNet.mlmodel in Sources */ = {isa = PBXBuildFile; fileRef = 6A3935261FF2C6830026A7DB /* MobileNet.mlmodel */; };
-		6A39352D1FF80EE50026A7DB /* CGImagePropertyOrientation+UIImageOrientation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A39352C1FF80EE50026A7DB /* CGImagePropertyOrientation+UIImageOrientation.swift */; };
 		A007122D1F36568B00D192A6 /* PlaneRectangle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A007122C1F36568B00D192A6 /* PlaneRectangle.swift */; };
 		A00712351F379F4800D192A6 /* Message.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00712341F379F4800D192A6 /* Message.swift */; };
 		A04A97D91F34547100D93A39 /* SCNVector3+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04A97D81F34547100D93A39 /* SCNVector3+Extensions.swift */; };
@@ -30,7 +29,6 @@
 		6A3934E21FE483970026A7DB /* Andrew+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Andrew+Extensions.swift"; sourceTree = "<group>"; };
 		6A3935241FF06E840026A7DB /* Resnet50.mlmodel */ = {isa = PBXFileReference; lastKnownFileType = file.mlmodel; path = Resnet50.mlmodel; sourceTree = "<group>"; };
 		6A3935261FF2C6830026A7DB /* MobileNet.mlmodel */ = {isa = PBXFileReference; lastKnownFileType = file.mlmodel; path = MobileNet.mlmodel; sourceTree = "<group>"; };
-		6A39352C1FF80EE50026A7DB /* CGImagePropertyOrientation+UIImageOrientation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CGImagePropertyOrientation+UIImageOrientation.swift"; sourceTree = "<group>"; };
 		A007122C1F36568B00D192A6 /* PlaneRectangle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaneRectangle.swift; sourceTree = "<group>"; };
 		A00712341F379F4800D192A6 /* Message.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Message.swift; sourceTree = "<group>"; };
 		A007123A1F38106500D192A6 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
@@ -69,7 +67,6 @@
 				A04A97D81F34547100D93A39 /* SCNVector3+Extensions.swift */,
 				A066058C1F35258700BF2012 /* ARHitTestResult+Extensions.swift */,
 				6A3934E21FE483970026A7DB /* Andrew+Extensions.swift */,
-				6A39352C1FF80EE50026A7DB /* CGImagePropertyOrientation+UIImageOrientation.swift */,
 			);
 			path = "Extensions + Utilities";
 			sourceTree = "<group>";
@@ -193,7 +190,6 @@
 			files = (
 				A0E91F4C1F341E3800B511F8 /* ViewController.swift in Sources */,
 				A04A97D91F34547100D93A39 /* SCNVector3+Extensions.swift in Sources */,
-				6A39352D1FF80EE50026A7DB /* CGImagePropertyOrientation+UIImageOrientation.swift in Sources */,
 				A066058D1F35258700BF2012 /* ARHitTestResult+Extensions.swift in Sources */,
 				6A3934E31FE483970026A7DB /* Andrew+Extensions.swift in Sources */,
 				6A3935271FF2C6840026A7DB /* MobileNet.mlmodel in Sources */,
